@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Photography Prize Wheel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            max-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        #container {
+            background: white;
+            /* border-radius: 20px; */
+            padding: 20px;
+            /* box-shadow: 0 10px 30px rgba(197, 10, 110, 0.2); */
+            text-align: center;
+            /* max-width: 800px; */
+            width: 100%;
+            max-height: 100vh;
+            /* overflow-y: auto; */
+            /* position: relative; */
+        }
+        
+        .logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            color: #c50a6e;
+            margin-bottom: 15px;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        #chart {
+            margin: 15px auto;
+        }
+        
+        #question {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #c50a6e;
+        }
+        
+        #question h2 {
+            color: #333;
+            font-size: 1.4em;
+            margin: 0;
+            line-height: 1.4;
+        }
+        
+        .probability {
+            color: #666;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        
+        .slice text {
+            font-size: 10px;
+            font-weight: bold;
+            fill: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+        
+        .spin-button {
+            font-size: 24px;
+            font-weight: bold;
+            fill: #333;
+            cursor: pointer;
+        }
+        
+        .instructions {
+            margin-top: 15px;
+            color: #666;
+            font-size: 1em;
+        }
+        
+        .confetti {
+            position: absolute;
+            margin-top: 30px;
+            width: 10px;
+            height: 10px;
+            background: #c50a6e;
+            animation: confetti-fall 3s linear forwards;
+            pointer-events: none;
+        }
+        
+        .confetti:nth-child(odd) {
+            background: #FFD700;
+            border-radius: 50%;
+        }
+        
+        .confetti:nth-child(even) {
+            background: #c50a6e;
+            transform: rotate(45deg);
+        }
+        
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        .gold-prize {
+            fill: #FFD700 !important;
+            stroke: #B8860B !important;
+            stroke-width: 2px !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <img src="https://studiofiveweddings.com/wp-content/uploads/2024/05/ST5-Weddings-Logo-01.png" alt="Studio Five Weddings Logo" class="logo">
+        <h1>Studio Five Weddings Prize Wheel</h1>
+        <div id="chart"></div>
+        <div id="question">
+            <h2>Click the wheel to spin and win a prize!</h2>
+            <div class="probability"></div>
+        </div>
+        <div class="instructions">
+            Click the white "SPIN" button in the center to try your luck!
+        </div>
+    </div>
+
+    <script>
+        // Sound effects
+        function playSpinSound() {
+            // Create a spinning sound using Web Audio API
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 2.5);
+            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 3);
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 3);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 3);
+        }
+        
+        function playWinSound() {
+            // Create a winning sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(523, audioContext.currentTime); // C5
+            oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1); // E5
+            oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2); // G5
+            oscillator.frequency.setValueAtTime(1047, audioContext.currentTime + 0.3); // C6
+            
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+        
+        function createConfetti() {
+            const container = document.getElementById('container');
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.animationDelay = Math.random() * 2 + 's';
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                container.appendChild(confetti);
+                
+                // Remove confetti after animation
+                setTimeout(() => {
+                    if (confetti.parentNode) {
+                        confetti.parentNode.removeChild(confetti);
+                    }
+                }, 5000);
+            }
+        }
+
+        var padding = { top: 10, right: 20, bottom: 0, left: 0 },
+            w = 400 - padding.left - padding.right,
+            h = 400 - padding.top - padding.bottom,
+            r = Math.min(w, h) / 2,
+            rotation = 0,
+            oldrotation = 0,
+            picked = 100000,
+            oldpick = [],
+            color = d3.scale.category20();
+
+        // Wedding photography prizes with probabilities
+        var data = [
+            { "label": "Full Pre-Wed Photo+Video", "value": 1, "probability": 1, "description": "Complete pre-wedding photography and videography package" },
+            { "label": "Large Album Upgrade", "value": 2, "probability": 4, "description": "Upgrade to premium large wedding album" },
+            { "label": "90-min Pre-Wed Shoot", "value": 3, "probability": 4, "description": "Extended 90-minute pre-wedding photoshoot" },
+            { "label": "2-Hour Photobooth", "value": 4, "probability": 3, "description": "Professional photobooth service for 2 hours" },
+            { "label": "200 Invitation Cards", "value": 5, "probability": 16, "description": "Custom designed wedding invitation cards" },
+            { "label": "A1 Foamboard Poster", "value": 6, "probability": 9, "description": "Large A1 size foamboard poster of your photo" },
+            { "label": "A1 Acrylic Poster", "value": 7, "probability": 7, "description": "Premium A1 acrylic poster display" },
+            { "label": "S8R Photo Frame", "value": 8, "probability": 15, "description": "Professional S8R size framed photograph" },
+            { "label": "Pano Frame", "value": 9, "probability": 15, "description": "Panoramic photo frame display" },
+            { "label": "Iframe", "value": 10, "probability": 15, "description": "Digital photo frame with your memories" },
+            { "label": "16R Canvas Frame", "value": 11, "probability": 6, "description": "16R size canvas print in elegant frame" },
+            { "label": "20R Canvas Print", "value": 12, "probability": 5, "description": "Large 20R canvas print of your photo" }
+        ];
+
+        // Create weighted segments based on probability
+        var weightedData = [];
+        data.forEach(function(item) {
+            for(var i = 0; i < item.probability; i++) {
+                weightedData.push(item);
+            }
+        });
+
+        var svg = d3.select('#chart')
+            .append("svg")
+            .data([data])
+            .attr("width", w + padding.left + padding.right)
+            .attr("height", h + padding.top + padding.bottom);
+
+        var container = svg.append("g")
+            .attr("class", "chartholder")
+            .attr("transform", "translate(" + (w / 2 + padding.left) + "," + (h / 2 + padding.top) + ")");
+
+        var vis = container.append("g");
+
+        var pie = d3.layout.pie().sort(null).value(function (d) { return 1; }); // Equal segments
+
+        var arc = d3.svg.arc().outerRadius(r);
+
+        var arcs = vis.selectAll("g.slice")
+            .data(pie(data))
+            .enter()
+            .append("g")
+            .attr("class", "slice");
+
+        // Create single color scheme based on #c50a6e
+        var brandColor = d3.scale.ordinal()
+            .range([
+                "#c50a6e", "#d12f7a", "#dd5486", "#e97993", 
+                "#f59ea0", "#ffc3ad", "#ff8ba7", "#f26d99", 
+                "#e64f8b", "#da317d", "#ce136f", "#c50a6e"
+            ]);
+
+        arcs.append("path")
+            .attr("fill", function (d, i) { 
+                // Make the first prize (Full Pre-Wed Photo+Video) gold
+                return i === 0 ? "#FFD700" : brandColor(i); 
+            })
+            .attr("stroke", function (d, i) { 
+                return i === 0 ? "#B8860B" : "none"; 
+            })
+            .attr("stroke-width", function (d, i) { 
+                return i === 0 ? 2 : 0; 
+            })
+            .attr("d", function (d) { return arc(d); });
+
+        // Add the text labels
+        arcs.append("text").attr("transform", function (d) {
+            d.innerRadius = 0;
+            d.outerRadius = r;
+            d.angle = (d.startAngle + d.endAngle) / 2;
+            return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")translate(" + (d.outerRadius - 10) + ")";
+        })
+        .attr("text-anchor", "end")
+        .attr("fill", function (d, i) {
+            // Use black text for gold segment for better visibility
+            return i === 0 ? "#000" : "white";
+        })
+        .text(function (d, i) {
+            // Truncate long labels for better display
+            var label = d.data.label;
+            return label.length > 12 ? label.substring(0, 12) + "..." : label;
+        });
+
+        container.on("click", spin);
+
+        function spin(d) {
+            container.on("click", null);
+            
+            // Play spin sound
+            playSpinSound();
+            
+            // Calculate weighted random selection
+            var totalWeight = weightedData.length;
+            var randomIndex = Math.floor(Math.random() * totalWeight);
+            var selectedItem = weightedData[randomIndex];
+            
+            // Find the index in original data array
+            picked = data.findIndex(item => item.value === selectedItem.value);
+            
+            // Calculate rotation to land on selected segment
+            var segmentAngle = 360 / data.length;
+            var targetAngle = picked * segmentAngle + (segmentAngle / 2);
+            
+            // Add multiple rotations for dramatic effect
+            var spins = 4; // Number of full rotations
+            rotation = (spins * 360) + (360 - targetAngle);
+            
+            vis.transition()
+                .duration(3000)
+                .attrTween("transform", rotTween)
+                .each("end", function () {
+                    // Play win sound
+                    playWinSound();
+                    
+                    // Create confetti effect
+                    createConfetti();
+                    
+                    // Highlight the selected segment
+                    if (picked !== 0) { // Don't change color if it's already gold
+                        d3.select(".slice:nth-child(" + (picked + 1) + ") path")
+                            .attr("fill", "#FFD700")
+                            .attr("stroke", "#c50a6e")
+                            .attr("stroke-width", 3);
+                    }
+                    
+                    // Display the prize
+                    d3.select("#question h2")
+                        .text("🎉 Congratulations! You won: " + data[picked].label + " 🎉");
+                    
+                    d3.select("#question .probability")
+                        .html("<strong>Prize Details:</strong> " + data[picked].description + 
+                              "<br><strong>Probability:</strong> " + data[picked].probability + "%");
+                    
+                    oldrotation = rotation;
+                    
+                    // Re-enable spinning after 3 seconds
+                    setTimeout(function() {
+                        container.on("click", spin);
+                        // Reset colors (except for the first prize which stays gold)
+                        d3.selectAll(".slice path")
+                            .attr("fill", function (d, i) { 
+                                return i === 0 ? "#FFD700" : brandColor(i); 
+                            })
+                            .attr("stroke", function (d, i) { 
+                                return i === 0 ? "#B8860B" : "none"; 
+                            })
+                            .attr("stroke-width", function (d, i) { 
+                                return i === 0 ? 2 : 0; 
+                            });
+                    }, 3000);
+                });
+        }
+
+        // Make arrow pointer (positioned at top)
+        svg.append("g")
+            .attr("transform", "translate(" + (w/2 + padding.left) + "," + (padding.top + 5) + ")")
+            .append("path")
+            .attr("d", "M-" + (r * .08) + "," + (r * .15) + "L0,0L" + (r * .08) + "," + (r * .15) + "Z")
+            .style({ "fill": "#c50a6e", "stroke": "white", "stroke-width": 2 });
+
+        // Draw spin button circle
+        container.append("circle")
+            .attr("cx", 0)
+            .attr("cy", 0)
+            .attr("r", 50)
+            .style({ "fill": "white", "cursor": "pointer", "stroke": "#c50a6e", "stroke-width": 3 });
+
+        // Spin button text
+        container.append("text")
+            .attr("x", 0)
+            .attr("y", 12)
+            .attr("text-anchor", "middle")
+            .attr("class", "spin-button")
+            .text("SPIN")
+            .style({ "font-weight": "bold", "font-size": "24px", "fill": "#c50a6e" });
+
+        function rotTween(to) {
+            var i = d3.interpolate(oldrotation % 360, rotation);
+            return function (t) {
+                return "rotate(" + i(t) + ")";
+            };
+        }
+    </script>
+</body>
+</html>
